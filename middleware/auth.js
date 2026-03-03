@@ -4,8 +4,8 @@ const isAuthenticated = (req, res, next) => {
     return next();
   }
   
-  // Check if this is an API request
-  if (req.path?.startsWith('/api/')) {
+  // Check if this is an API request using originalUrl (includes /api prefix)
+  if (req.originalUrl?.startsWith('/api/') || req.path?.startsWith('/api/')) {
     return res.status(401).json({
       success: false,
       message: 'Unauthorized - Please log in',
@@ -18,7 +18,7 @@ const isAuthenticated = (req, res, next) => {
 // Middleware to check if user is admin
 const isAdmin = (req, res, next) => {
   if (!req.isAuthenticated()) {
-    if (req.path?.startsWith('/api/')) {
+    if (req.originalUrl?.startsWith('/api/') || req.path?.startsWith('/api/')) {
       return res.status(401).json({
         success: false,
         message: 'Unauthorized - Please log in',
@@ -31,7 +31,7 @@ const isAdmin = (req, res, next) => {
     return next();
   }
   
-  if (req.path?.startsWith('/api/')) {
+  if (req.originalUrl?.startsWith('/api/') || req.path?.startsWith('/api/')) {
     return res.status(403).json({
       success: false,
       message: 'Access Denied: Admin privileges required',
@@ -50,7 +50,7 @@ const isNotAuthenticated = (req, res, next) => {
   }
   
   // Check if this is an API request
-  if (req.path?.startsWith('/api/')) {
+  if (req.originalUrl?.startsWith('/api/') || req.path?.startsWith('/api/')) {
     return res.json({
       success: false,
       message: 'Already authenticated. Redirect to home.',
