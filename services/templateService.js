@@ -57,12 +57,17 @@ exports.getFilteredTemplates = async (query = {}, options = {}) => {
   }
 
   // Handle multiple category selections (comma-separated)
+  // Database stores category as "Module - Subcategory" format, so use regex matching
   if (category) {
     const categories = category.split(',').map(c => c.trim()).filter(c => c && c !== 'Other');
     if (categories.length === 1) {
-      filter.category = categories[0];
+      // Use regex to match category that starts with the module name
+      // e.g., "Footprinting" matches "Footprinting - FTP", "Footprinting - SMB", etc.
+      filter.category = { $regex: `^${categories[0]}(\\s*-|$)`, $options: 'i' };
     } else if (categories.length > 1) {
-      filter.category = { $in: categories };
+      // For multiple categories, match any of them
+      const categoryPatterns = categories.map(c => `^${c}(\\s*-|$)`).join('|');
+      filter.category = { $regex: categoryPatterns, $options: 'i' };
     }
   }
   
@@ -187,12 +192,16 @@ exports.getMyFilteredTemplates = async (userId, query = {}) => {
   const filter = { createdBy: userId };
 
   // Handle multiple category selections (comma-separated)
+  // Database stores category as "Module - Subcategory" format, so use regex matching
   if (category) {
     const categories = category.split(',').map(c => c.trim()).filter(c => c && c !== 'Other');
     if (categories.length === 1) {
-      filter.category = categories[0];
+      // Use regex to match category that starts with the module name
+      filter.category = { $regex: `^${categories[0]}(\\s*-|$)`, $options: 'i' };
     } else if (categories.length > 1) {
-      filter.category = { $in: categories };
+      // For multiple categories, match any of them
+      const categoryPatterns = categories.map(c => `^${c}(\\s*-|$)`).join('|');
+      filter.category = { $regex: categoryPatterns, $options: 'i' };
     }
   }
   
