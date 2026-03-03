@@ -173,50 +173,13 @@ exports.getFilterOptions = async (req, res) => {
  */
 exports.getMyTemplates = async (req, res) => {
   try {
-    const { page = 1, limit = 10, sort = 'newest' } = req.query;
-    
-    // Build sort object
-    const sortMap = {
-      newest: { createdAt: -1 },
-      oldest: { createdAt: 1 },
-      'most-rated': { averageRating: -1 },
-      'most-used': { usageCount: -1 },
-      'a-z': { name: 1 },
-      'z-a': { name: -1 },
-    };
-    
-    const sortObj = sortMap[sort] || sortMap.newest;
-    
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    // Get user's templates
-    const templates = await AttackTemplate.find({ createdBy: req.user._id })
-      .populate('createdBy', 'username')
-      .sort(sortObj)
-      .skip(skip)
-      .limit(parseInt(limit));
-    
-    const total = await AttackTemplate.countDocuments({ createdBy: req.user._id });
-    
-    // Restructure ratings for consistent format across all responses
-    const restructuredTemplates = templates.map(t => {
-      const data = t.toObject();
-      data.ratings = {
-        averageRating: data.averageRating,
-        totalRatings: data.totalRatings,
-      };
-      return data;
-    });
-    
+    const userId = req.user._id;
+    const result = await templateService.getMyFilteredTemplates(userId, req.query);
+
     res.json({
       success: true,
-      data: restructuredTemplates,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit)),
-      },
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (err) {
     console.error(err);
