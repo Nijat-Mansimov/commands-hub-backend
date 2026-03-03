@@ -114,6 +114,80 @@ exports.getFilteredTemplates = async (query = {}, options = {}) => {
 };
 
 /**
+ * Get user's filtered templates
+ * Similar to getFilteredTemplates but only for the authenticated user's templates
+ */
+exports.getMyFilteredTemplates = async (userId, query = {}) => {
+  const {
+    page = 1,
+    limit = 10,
+    sort = 'newest',
+    category,
+    subcategory,
+    tool,
+    targetSystem,
+    difficulty,
+    search,
+    minRating = 0,
+  } = query;
+
+  // Build sort object from sort parameter
+  const sortMap = {
+    newest: { createdAt: -1 },
+    oldest: { createdAt: 1 },
+    mostUsed: { usageCount: -1 },
+    topRated: { averageRating: -1 },
+    'a-z': { name: 1 },
+    'z-a': { name: -1 },
+  };
+
+  const sortObj = sortMap[sort] || sortMap.newest;
+
+  // Start with user's templates
+  const filter = { createdBy: userId };
+
+  if (category) filter.category = category;
+  if (subcategory) filter.subcategory = subcategory;
+  if (tool) filter.tool = { $regex: tool, $options: 'i' };
+  if (targetSystem) filter.targetSystem = targetSystem;
+  if (difficulty) filter.difficulty = difficulty;
+  if (minRating > 0) filter.averageRating = { $gte: minRating };
+
+  if (search) {
+    filter.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } },
+      { tags: { $in: [new RegExp(search, 'i')] } },
+      { category: { $regex: search, $options: 'i' } },
+      { tool: { $regex: search, $options: 'i' } },
+    ];
+  }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const templates = await AttackTemplate.find(filter)
+    .populate('createdBy', 'username')
+    .sort(sortObj)
+    .skip(skip)
+    .limit(parseInt(limit));
+
+  const total = await AttackTemplate.countDocuments(filter);
+
+  // Restructure ratings for all templates to be consistent
+  const restructuredTemplates = templates.map(restructureTemplateRatings);
+
+  return {
+    data: restructuredTemplates,
+    pagination: {
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      pages: Math.ceil(total / parseInt(limit)),
+    },
+  };
+};
+
+/**
  * Get popular templates by ratings/usage
  */
 exports.getPopularTemplates = async (limit = 10) => {
