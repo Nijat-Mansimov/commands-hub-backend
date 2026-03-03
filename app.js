@@ -63,7 +63,7 @@ const app = express();
       },
     }));
 
-    // Passport middleware - MUST come after session
+    // Passport middleware
     app.use(passport.initialize());
     app.use(passport.session());
 
