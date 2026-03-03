@@ -57,7 +57,7 @@ const app = express();
       cookie: {
         secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
         httpOnly: true,
-        sameSite: 'lax', // Important for CORS with credentials
+        sameSite: 'none', // 'none' required for cross-domain requests (frontend and API on different Render subdomains)
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         path: '/', // Ensure cookie is available for all paths
       },
