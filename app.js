@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const passport = require('passport');
@@ -49,19 +50,31 @@ const app = express();
     app.set('trust proxy', 1);
 
     // Session middleware - MUST come before routes and passport
-    app.use(session({
+    const sessionConfig = {
       secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
-      resave: true, // Save session on every request to extend expiry and ensure persistence
-      saveUninitialized: true, // Save uninitialized sessions (required for login to work)
+      resave: false, // Don't save session if unmodified
+      saveUninitialized: false, // Don't save uninitialized sessions
       name: 'sessionId', // Custom session cookie name
+      store: MongoStore.create({
+        mongoUrl: process.env.MONGODB_URI || 'mongodb://localhost:27017/commands-hub',
+        touchAfter: 24 * 3600 // Lazy session update (24 hours)
+      }),
       cookie: {
-        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies only in production
         httpOnly: true,
-        sameSite: 'none', // 'none' required for cross-domain requests (frontend and API on different Render subdomains)
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Use 'lax' in development, 'none' in production
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         path: '/', // Ensure cookie is available for all paths
       },
-    }));
+    };
+
+    // In production with https, ensure sameSite: 'none' works with secure: true
+    if (process.env.NODE_ENV === 'production' && process.env.SECURE_COOKIES !== 'false') {
+      sessionConfig.cookie.secure = true;
+      sessionConfig.cookie.sameSite = 'none';
+    }
+
+    app.use(session(sessionConfig));
 
     // Passport middleware
     app.use(passport.initialize());
