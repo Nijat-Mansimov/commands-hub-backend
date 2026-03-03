@@ -56,15 +56,51 @@ exports.getFilteredTemplates = async (query = {}, options = {}) => {
     filter.isPrivate = false; // Only public if not logged in
   }
 
-  if (category) filter.category = category;
-  if (subcategory) filter.subcategory = subcategory;
+  // Handle multiple category selections (comma-separated)
+  if (category) {
+    const categories = category.split(',').map(c => c.trim()).filter(c => c && c !== 'Other');
+    if (categories.length === 1) {
+      filter.category = categories[0];
+    } else if (categories.length > 1) {
+      filter.category = { $in: categories };
+    }
+  }
+  
+  // Handle multiple subcategory selections (comma-separated)
+  if (subcategory) {
+    const subcategories = subcategory.split(',').map(s => s.trim()).filter(s => s && s !== 'Other');
+    if (subcategories.length === 1) {
+      filter.subcategory = subcategories[0];
+    } else if (subcategories.length > 1) {
+      filter.subcategory = { $in: subcategories };
+    }
+  }
+  
+  // Handle difficulty multi-select (comma-separated)
+  if (difficulty) {
+    const difficulties = difficulty.split(',').map(d => d.trim()).filter(d => d);
+    if (difficulties.length === 1) {
+      filter.difficulty = difficulties[0];
+    } else if (difficulties.length > 1) {
+      filter.difficulty = { $in: difficulties };
+    }
+  }
+  
+  // Handle targetSystem multi-select (comma-separated)
+  if (targetSystem) {
+    const systems = targetSystem.split(',').map(s => s.trim()).filter(s => s);
+    if (systems.length === 1) {
+      filter.targetSystem = systems[0];
+    } else if (systems.length > 1) {
+      filter.targetSystem = { $in: systems };
+    }
+  }
+  
   if (tool) filter.tool = { $regex: tool, $options: 'i' };
-  if (targetSystem) filter.targetSystem = targetSystem;
   if (attackProtocol) filter.attackProtocol = { $regex: attackProtocol, $options: 'i' };
   if (shellType) filter.shellType = shellType;
   if (platform) filter.platform = platform;
   if (payloadType) filter.payloadType = payloadType;
-  if (difficulty) filter.difficulty = difficulty;
   if (featured) filter.isFeatured = true;
   if (minRating > 0) filter.averageRating = { $gte: minRating };
 
@@ -73,6 +109,8 @@ exports.getFilteredTemplates = async (query = {}, options = {}) => {
       ...filter.$or,
       { name: { $regex: search, $options: 'i' } },
       { description: { $regex: search, $options: 'i' } },
+      { longDescription: { $regex: search, $options: 'i' } },
+      { commandTemplate: { $regex: search, $options: 'i' } },
       { tags: { $in: [new RegExp(search, 'i')] } },
       { category: { $regex: search, $options: 'i' } },
       { tool: { $regex: search, $options: 'i' } },
@@ -80,6 +118,8 @@ exports.getFilteredTemplates = async (query = {}, options = {}) => {
     ] : [
       { name: { $regex: search, $options: 'i' } },
       { description: { $regex: search, $options: 'i' } },
+      { longDescription: { $regex: search, $options: 'i' } },
+      { commandTemplate: { $regex: search, $options: 'i' } },
       { tags: { $in: [new RegExp(search, 'i')] } },
       { category: { $regex: search, $options: 'i' } },
       { tool: { $regex: search, $options: 'i' } },
@@ -146,17 +186,55 @@ exports.getMyFilteredTemplates = async (userId, query = {}) => {
   // Start with user's templates
   const filter = { createdBy: userId };
 
-  if (category) filter.category = category;
-  if (subcategory) filter.subcategory = subcategory;
+  // Handle multiple category selections (comma-separated)
+  if (category) {
+    const categories = category.split(',').map(c => c.trim()).filter(c => c && c !== 'Other');
+    if (categories.length === 1) {
+      filter.category = categories[0];
+    } else if (categories.length > 1) {
+      filter.category = { $in: categories };
+    }
+  }
+  
+  // Handle multiple subcategory selections (comma-separated)
+  if (subcategory) {
+    const subcategories = subcategory.split(',').map(s => s.trim()).filter(s => s && s !== 'Other');
+    if (subcategories.length === 1) {
+      filter.subcategory = subcategories[0];
+    } else if (subcategories.length > 1) {
+      filter.subcategory = { $in: subcategories };
+    }
+  }
+  
+  // Handle difficulty multi-select (comma-separated)
+  if (difficulty) {
+    const difficulties = difficulty.split(',').map(d => d.trim()).filter(d => d);
+    if (difficulties.length === 1) {
+      filter.difficulty = difficulties[0];
+    } else if (difficulties.length > 1) {
+      filter.difficulty = { $in: difficulties };
+    }
+  }
+  
+  // Handle targetSystem multi-select (comma-separated)
+  if (targetSystem) {
+    const systems = targetSystem.split(',').map(s => s.trim()).filter(s => s);
+    if (systems.length === 1) {
+      filter.targetSystem = systems[0];
+    } else if (systems.length > 1) {
+      filter.targetSystem = { $in: systems };
+    }
+  }
+  
   if (tool) filter.tool = { $regex: tool, $options: 'i' };
-  if (targetSystem) filter.targetSystem = targetSystem;
-  if (difficulty) filter.difficulty = difficulty;
   if (minRating > 0) filter.averageRating = { $gte: minRating };
 
   if (search) {
     filter.$or = [
       { name: { $regex: search, $options: 'i' } },
       { description: { $regex: search, $options: 'i' } },
+      { longDescription: { $regex: search, $options: 'i' } },
+      { commandTemplate: { $regex: search, $options: 'i' } },
       { tags: { $in: [new RegExp(search, 'i')] } },
       { category: { $regex: search, $options: 'i' } },
       { tool: { $regex: search, $options: 'i' } },
