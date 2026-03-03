@@ -45,15 +45,19 @@ exports.getFilteredTemplates = async (query = {}, options = {}) => {
 
   const userId = options.userId;
 
-  // Show public templates, plus private templates if user is owner
-  const filter = { published: true };
+  // Build the filter conditions
+  const conditions = [{ published: true }];
+  
+  // Add privacy conditions
   if (userId) {
-    filter.$or = [
-      { isPrivate: false },
-      { isPrivate: true, createdBy: userId }
-    ];
+    conditions.push({
+      $or: [
+        { isPrivate: false },
+        { isPrivate: true, createdBy: userId }
+      ]
+    });
   } else {
-    filter.isPrivate = false; // Only public if not logged in
+    conditions.push({ isPrivate: false }); // Only public if not logged in
   }
 
   // Handle multiple category selections (comma-separated)
@@ -63,11 +67,11 @@ exports.getFilteredTemplates = async (query = {}, options = {}) => {
     if (categories.length === 1) {
       // Use regex to match category that starts with the module name
       // e.g., "Footprinting" matches "Footprinting - FTP", "Footprinting - SMB", etc.
-      filter.category = { $regex: `^${categories[0]}(\\s*-|$)`, $options: 'i' };
+      conditions.push({ category: { $regex: `^${categories[0]}(\\s*-|$)`, $options: 'i' } });
     } else if (categories.length > 1) {
       // For multiple categories, match any of them
       const categoryPatterns = categories.map(c => `^${c}(\\s*-|$)`).join('|');
-      filter.category = { $regex: categoryPatterns, $options: 'i' };
+      conditions.push({ category: { $regex: categoryPatterns, $options: 'i' } });
     }
   }
   
@@ -75,9 +79,9 @@ exports.getFilteredTemplates = async (query = {}, options = {}) => {
   if (subcategory) {
     const subcategories = subcategory.split(',').map(s => s.trim()).filter(s => s && s !== 'Other');
     if (subcategories.length === 1) {
-      filter.subcategory = subcategories[0];
+      conditions.push({ subcategory: subcategories[0] });
     } else if (subcategories.length > 1) {
-      filter.subcategory = { $in: subcategories };
+      conditions.push({ subcategory: { $in: subcategories } });
     }
   }
   
@@ -85,9 +89,9 @@ exports.getFilteredTemplates = async (query = {}, options = {}) => {
   if (difficulty) {
     const difficulties = difficulty.split(',').map(d => d.trim()).filter(d => d);
     if (difficulties.length === 1) {
-      filter.difficulty = difficulties[0];
+      conditions.push({ difficulty: difficulties[0] });
     } else if (difficulties.length > 1) {
-      filter.difficulty = { $in: difficulties };
+      conditions.push({ difficulty: { $in: difficulties } });
     }
   }
   
@@ -95,42 +99,38 @@ exports.getFilteredTemplates = async (query = {}, options = {}) => {
   if (targetSystem) {
     const systems = targetSystem.split(',').map(s => s.trim()).filter(s => s);
     if (systems.length === 1) {
-      filter.targetSystem = systems[0];
+      conditions.push({ targetSystem: systems[0] });
     } else if (systems.length > 1) {
-      filter.targetSystem = { $in: systems };
+      conditions.push({ targetSystem: { $in: systems } });
     }
   }
   
-  if (tool) filter.tool = { $regex: tool, $options: 'i' };
-  if (attackProtocol) filter.attackProtocol = { $regex: attackProtocol, $options: 'i' };
-  if (shellType) filter.shellType = shellType;
-  if (platform) filter.platform = platform;
-  if (payloadType) filter.payloadType = payloadType;
-  if (featured) filter.isFeatured = true;
-  if (minRating > 0) filter.averageRating = { $gte: minRating };
+  if (tool) conditions.push({ tool: { $regex: tool, $options: 'i' } });
+  if (attackProtocol) conditions.push({ attackProtocol: { $regex: attackProtocol, $options: 'i' } });
+  if (shellType) conditions.push({ shellType: shellType });
+  if (platform) conditions.push({ platform: platform });
+  if (payloadType) conditions.push({ payloadType: payloadType });
+  if (featured) conditions.push({ isFeatured: true });
+  if (minRating > 0) conditions.push({ averageRating: { $gte: minRating } });
 
+  // Handle search - must match ANY of these fields
   if (search) {
-    filter.$or = filter.$or ? [
-      ...filter.$or,
-      { name: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
-      { longDescription: { $regex: search, $options: 'i' } },
-      { commandTemplate: { $regex: search, $options: 'i' } },
-      { tags: { $in: [new RegExp(search, 'i')] } },
-      { category: { $regex: search, $options: 'i' } },
-      { tool: { $regex: search, $options: 'i' } },
-      { attackProtocol: { $regex: search, $options: 'i' } },
-    ] : [
-      { name: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
-      { longDescription: { $regex: search, $options: 'i' } },
-      { commandTemplate: { $regex: search, $options: 'i' } },
-      { tags: { $in: [new RegExp(search, 'i')] } },
-      { category: { $regex: search, $options: 'i' } },
-      { tool: { $regex: search, $options: 'i' } },
-      { attackProtocol: { $regex: search, $options: 'i' } },
-    ];
+    conditions.push({
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { longDescription: { $regex: search, $options: 'i' } },
+        { commandTemplate: { $regex: search, $options: 'i' } },
+        { tags: { $in: [new RegExp(search, 'i')] } },
+        { category: { $regex: search, $options: 'i' } },
+        { tool: { $regex: search, $options: 'i' } },
+        { attackProtocol: { $regex: search, $options: 'i' } },
+      ]
+    });
   }
+
+  // Combine all conditions with AND
+  const filter = conditions.length === 1 ? conditions[0] : { $and: conditions };
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const sortObject = { [sortBy]: parseInt(sortOrder) };
@@ -188,8 +188,8 @@ exports.getMyFilteredTemplates = async (userId, query = {}) => {
 
   const sortObj = sortMap[sort] || sortMap.newest;
 
-  // Start with user's templates
-  const filter = { createdBy: userId };
+  // Build the filter conditions
+  const conditions = [{ createdBy: userId }];
 
   // Handle multiple category selections (comma-separated)
   // Database stores category as "Module - Subcategory" format, so use regex matching
@@ -197,11 +197,11 @@ exports.getMyFilteredTemplates = async (userId, query = {}) => {
     const categories = category.split(',').map(c => c.trim()).filter(c => c && c !== 'Other');
     if (categories.length === 1) {
       // Use regex to match category that starts with the module name
-      filter.category = { $regex: `^${categories[0]}(\\s*-|$)`, $options: 'i' };
+      conditions.push({ category: { $regex: `^${categories[0]}(\\s*-|$)`, $options: 'i' } });
     } else if (categories.length > 1) {
       // For multiple categories, match any of them
       const categoryPatterns = categories.map(c => `^${c}(\\s*-|$)`).join('|');
-      filter.category = { $regex: categoryPatterns, $options: 'i' };
+      conditions.push({ category: { $regex: categoryPatterns, $options: 'i' } });
     }
   }
   
@@ -209,9 +209,9 @@ exports.getMyFilteredTemplates = async (userId, query = {}) => {
   if (subcategory) {
     const subcategories = subcategory.split(',').map(s => s.trim()).filter(s => s && s !== 'Other');
     if (subcategories.length === 1) {
-      filter.subcategory = subcategories[0];
+      conditions.push({ subcategory: subcategories[0] });
     } else if (subcategories.length > 1) {
-      filter.subcategory = { $in: subcategories };
+      conditions.push({ subcategory: { $in: subcategories } });
     }
   }
   
@@ -219,9 +219,9 @@ exports.getMyFilteredTemplates = async (userId, query = {}) => {
   if (difficulty) {
     const difficulties = difficulty.split(',').map(d => d.trim()).filter(d => d);
     if (difficulties.length === 1) {
-      filter.difficulty = difficulties[0];
+      conditions.push({ difficulty: difficulties[0] });
     } else if (difficulties.length > 1) {
-      filter.difficulty = { $in: difficulties };
+      conditions.push({ difficulty: { $in: difficulties } });
     }
   }
   
@@ -229,26 +229,32 @@ exports.getMyFilteredTemplates = async (userId, query = {}) => {
   if (targetSystem) {
     const systems = targetSystem.split(',').map(s => s.trim()).filter(s => s);
     if (systems.length === 1) {
-      filter.targetSystem = systems[0];
+      conditions.push({ targetSystem: systems[0] });
     } else if (systems.length > 1) {
-      filter.targetSystem = { $in: systems };
+      conditions.push({ targetSystem: { $in: systems } });
     }
   }
   
-  if (tool) filter.tool = { $regex: tool, $options: 'i' };
-  if (minRating > 0) filter.averageRating = { $gte: minRating };
+  if (tool) conditions.push({ tool: { $regex: tool, $options: 'i' } });
+  if (minRating > 0) conditions.push({ averageRating: { $gte: minRating } });
 
+  // Handle search - must match ANY of these fields
   if (search) {
-    filter.$or = [
-      { name: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
-      { longDescription: { $regex: search, $options: 'i' } },
-      { commandTemplate: { $regex: search, $options: 'i' } },
-      { tags: { $in: [new RegExp(search, 'i')] } },
-      { category: { $regex: search, $options: 'i' } },
-      { tool: { $regex: search, $options: 'i' } },
-    ];
+    conditions.push({
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { longDescription: { $regex: search, $options: 'i' } },
+        { commandTemplate: { $regex: search, $options: 'i' } },
+        { tags: { $in: [new RegExp(search, 'i')] } },
+        { category: { $regex: search, $options: 'i' } },
+        { tool: { $regex: search, $options: 'i' } },
+      ]
+    });
   }
+
+  // Combine all conditions with AND
+  const filter = conditions.length === 1 ? conditions[0] : { $and: conditions };
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
 
