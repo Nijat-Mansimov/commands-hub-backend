@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const bodyParser = require('body-parser');
@@ -24,17 +25,23 @@ const app = express();
           'http://localhost:3000',
           'http://localhost:8080',
           'https://commandshub.onrender.com',
-          ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : [])
         ];
         
+        // Add additional origins from env if not wildcard
+        if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
+          allowedOrigins.push(...process.env.CORS_ORIGIN.split(',').map(o => o.trim()));
+        }
+        
         // Allow requests with no origin (like mobile apps or curl requests)
+        // For CORS with credentials, origin must be explicitly listed (not *)
         if (!origin || allowedOrigins.includes(origin)) {
           callback(null, true);
         } else {
+          console.warn(`[CORS] Blocked request from unauthorized origin: ${origin}. Allowed: ${allowedOrigins.join(', ')}`);
           callback(new Error('Not allowed by CORS'));
         }
       },
-      credentials: true,
+      credentials: true, // Enable cookies for cross-origin requests
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
       maxAge: 86400,
@@ -45,6 +52,7 @@ const app = express();
 
     app.use(bodyParser.json());
     app.use(bodyParser.urlencoded({ extended: true }));
+    app.use(cookieParser()); // Parse cookies from incoming requests
 
     // Trust proxy - important for production
     app.set('trust proxy', 1);
@@ -60,18 +68,22 @@ const app = express();
         touchAfter: 24 * 3600 // Lazy session update (24 hours)
       }),
       cookie: {
-        secure: process.env.NODE_ENV === 'production', // Use secure cookies only in production
+        secure: false, // Will be set to true below for cross-domain
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Use 'lax' in development, 'none' in production
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         path: '/', // Ensure cookie is available for all paths
       },
     };
 
-    // In production with https, ensure sameSite: 'none' works with secure: true
-    if (process.env.NODE_ENV === 'production' && process.env.SECURE_COOKIES !== 'false') {
+    // For Render deployments or cross-domain requests, use strict secure settings
+    // sameSite: 'none' requires secure: true for browser to send cookies across domains
+    if (process.env.NODE_ENV === 'production' || process.env.RENDER === 'true' || process.env.SECURE_COOKIES === 'true') {
       sessionConfig.cookie.secure = true;
       sessionConfig.cookie.sameSite = 'none';
+      console.log('[SESSION] Using secure cross-domain cookie settings (sameSite: none, secure: true)');
+    } else {
+      console.log(`[SESSION] Using development cookie settings (sameSite: ${sessionConfig.cookie.sameSite}, secure: ${sessionConfig.cookie.secure})`);
     }
 
     app.use(session(sessionConfig));
@@ -83,7 +95,16 @@ const app = express();
     // Debug middleware - log session info
     app.use((req, res, next) => {
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[SESSION] ${req.method} ${req.path} - Authenticated: ${req.isAuthenticated()}, User: ${req.user?._id}`);
+        const hasSessionCookie = !!req.cookies?.sessionId;
+        const isAuthenticated = req.isAuthenticated();
+        const userId = req.user?._id;
+        console.log(`[SESSION DEBUG] ${req.method} ${req.path}`);
+        console.log(`  - Has sessionId cookie: ${hasSessionCookie}`);
+        console.log(`  - Is authenticated: ${isAuthenticated}`);
+        console.log(`  - User ID: ${userId || 'none'}`);
+        if (req.path === '/api/auth/profile' || req.path === '/auth/profile') {
+          console.log(`  - Full req.user: ${JSON.stringify(req.user)}`);
+        }
       }
       next();
     });
