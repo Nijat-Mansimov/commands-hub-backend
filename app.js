@@ -18,9 +18,13 @@ const app = express();
     // Middleware
     const corsOptions = {
       origin: function (origin, callback) {
-        const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:3000')
-          .split(',')
-          .map(o => o.trim());
+        const allowedOrigins = [
+          'http://localhost:5173',
+          'http://localhost:3000',
+          'http://localhost:8080',
+          'https://commandshub.onrender.com',
+          ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : [])
+        ];
         
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin || allowedOrigins.includes(origin)) {
