@@ -1,0 +1,33 @@
+{
+  "name": "commands-hub",
+  "version": "1.0.0",
+  "description": "Commands-HUB: A centralized repository for attack command templates for cybersecurity professionals",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "keywords": [
+    "cybersecurity",
+    "pentesting",
+    "attack-templates",
+    "education"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^7.0.0",
+    "passport": "^0.6.0",
+    "passport-local": "^1.0.0",
+    "bcryptjs": "^2.4.3",
+    "express-session": "^1.17.3",
+    "dotenv": "^16.0.3",
+    "express-validator": "^7.0.0",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}
